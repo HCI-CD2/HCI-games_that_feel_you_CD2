@@ -1,8 +1,8 @@
-// Connects the camera, Face Landmarker and the emotion reader, and draws the results.
-// Privacy (target T7): frames are only read from memory. Nothing here saves or sends them.
+// The test page: draws the label, the evidence and the raw scores so we can tune emotion.js.
+// The camera and model loop itself lives in face_tracker.js, shared with the game.
 
-import { FaceLandmarker, FilesetResolver } from "./vendor/vision_bundle.mjs";
-import { createEmotionReader, THRESHOLD } from "./emotion.js";
+import { startFaceTracking } from "./face_tracker.js";
+import { THRESHOLD } from "./emotion.js";
 
 const SCORES_TO_SHOW = 10;
 
@@ -13,30 +13,6 @@ const confidenceText = document.getElementById("confidence");
 const evidencePanel = document.getElementById("evidence");
 const scoresPanel = document.getElementById("scores");
 const recalibrateButton = document.getElementById("recalibrate");
-
-const reader = createEmotionReader();
-recalibrateButton.addEventListener("click", () => reader.recalibrate());
-
-// Loads the WebAssembly runtime and the trained model. Both are large, so this
-// takes a moment, and "await" pauses here without freezing the page.
-async function createLandmarker() {
-  const vision = await FilesetResolver.forVisionTasks("./vendor/wasm");
-  return FaceLandmarker.createFromOptions(vision, {
-    baseOptions: { modelAssetPath: "./models/face_landmarker.task", delegate: "GPU" },
-    runningMode: "VIDEO",          // Frames arrive as a stream, so it can reuse the last result.
-    numFaces: 1,                   // The game only cares about one player.
-    outputFaceBlendshapes: true,   // The 52 movement scores. Off by default.
-  });
-}
-
-// Asks the browser for the camera. This is what triggers the permission popup.
-async function startCamera() {
-  video.srcObject = await navigator.mediaDevices.getUserMedia({
-    video: { width: 640, height: 480 },
-    audio: false,
-  });
-  await video.play();
-}
 
 // Builds one "name, bar, number" row. fraction (0 to 1) sets the bar length.
 function makeBar(name, value, fraction) {
@@ -91,38 +67,25 @@ function showReading(reading) {
   );
 }
 
-// Runs once per screen refresh, but only analyses frames the camera has updated.
-function startLoop(landmarker) {
-  let lastVideoTime = -1;
-
-  function tick() {
-    if (video.currentTime !== lastVideoTime) {
-      lastVideoTime = video.currentTime;
-      const now = performance.now();
-      const result = landmarker.detectForVideo(video, now);
-      const face = result.faceBlendshapes[0];
-
-      if (face) {
-        showScores(face.categories);
-        showReading(reader.update(face.categories, now));
-      } else {
-        statusText.textContent = "No face found";
-        scoresPanel.replaceChildren();
-      }
-    }
-    requestAnimationFrame(tick);
+// Called after every analysed frame.
+function onFrame({ categories, reading }) {
+  if (!reading) {
+    statusText.textContent = "No face found";
+    scoresPanel.replaceChildren();
+    return;
   }
-
-  tick();
+  showScores(categories);
+  showReading(reading);
 }
 
 async function main() {
   try {
-    statusText.textContent = "Loading the face model...";
-    const landmarker = await createLandmarker();
-    statusText.textContent = "Waiting for camera permission...";
-    await startCamera();
-    startLoop(landmarker);
+    const tracker = await startFaceTracking({
+      video,
+      onStatus: (text) => { statusText.textContent = text; },
+      onFrame,
+    });
+    recalibrateButton.addEventListener("click", tracker.recalibrate);
   } catch (error) {
     statusText.textContent = `Could not start: ${error.message}`;
     console.error(error);
