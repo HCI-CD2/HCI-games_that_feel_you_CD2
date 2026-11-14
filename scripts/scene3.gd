@@ -1,8 +1,21 @@
 extends Control
 
-const SUSPICION_LIMIT = 2
+const SUSPICION_LIMIT = 4  # raised from 2 because the face can now add suspicion too; tune by playtesting
 const NEXT_SCENE = "res://scenes/scene4.tscn"
 const END_SCENE = "res://scenes/scene1.tscn"
+
+# Face rules: looking stressed for at least FACE_SHARE of a question adds FACE_COST suspicion.
+# Windows with less than FACE_MIN_SECONDS of tracked face are ignored (no camera, face lost, etc).
+const FACE_SHARE = 0.5
+const FACE_COST = 1
+const FACE_MIN_SECONDS = 1.0
+
+# PLACEHOLDER lines for the design/story team to rewrite.
+const FACE_LINES = {
+	"nervous": ["You're pressing your lips together.", "That question made you tense."],
+	"afraid": ["Your eyes widened just now.", "You look frightened. Why?"],
+	"angry": ["That made you angry.", "Careful. Your face is getting hot."],
+}
 
 @onready var label = $Label
 @onready var name_label = $Name
@@ -106,6 +119,9 @@ var questions = [
 
 func _ready():
 	back_button.hide()
+	# The plan keeps suspicion hidden from players; debug builds still show it for testing.
+	if hud:
+		hud.visible = OS.is_debug_build()
 	next_button.pressed.connect(_on_next_pressed)
 	update_hud()
 	start_question()
@@ -124,6 +140,7 @@ func start_question():
 	phase = "question"
 	queue = make_queue(questions[q_index]["lines"], "Detective")
 	step = 0
+	FaceData.start_window()  # watch the face from the question until the answer
 	show_line()
 
 func show_line():
@@ -154,12 +171,28 @@ func clear_choices():
 	choices_box.hide()
 
 func _on_choice(o):
+	var face_line = face_reaction(FaceData.end_window())
 	suspicion += o["cost"]
+	if face_line != "":
+		suspicion += FACE_COST
 	update_hud()
 	phase = "reaction"
-	queue = make_queue([o["text"]], "You") + make_queue(o["reply"], "Detective")
+	queue = make_queue([o["text"]], "You")
+	if face_line != "":
+		queue += make_queue([face_line], "Detective")
+	queue += make_queue(o["reply"], "Detective")
 	step = 0
 	show_line()
+
+# Returns a detective line if the face gave the player away during this question, else "".
+func face_reaction(window):
+	if not FaceData.uses_face():
+		return ""
+	if window["seconds"] < FACE_MIN_SECONDS:
+		return ""
+	if window["stressed_share"] < FACE_SHARE:
+		return ""
+	return FACE_LINES[window["stressed_label"]].pick_random()
 
 func _on_next_pressed():
 	if step < queue.size() - 1:
