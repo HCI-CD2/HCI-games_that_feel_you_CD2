@@ -1,18 +1,27 @@
 extends Node
 ## Autoload: holds the latest webcam reading so any scene can use it, e.g. FaceData.label.
 ## In the browser it reads window.faceReading, which webcam/game_bridge.js keeps updated.
-## Anywhere else (e.g. running from the editor) there is no webcam, so keys 1-4 set the label by hand.
+## Anywhere else (e.g. running from the editor) there is no webcam, so the keys Z, X, C, V set the
+## label by hand. (1-4 are taken: they pick the answers.)
 ##
 ## Study conditions (see the wiki):
 ##   A = buttons only: the face is ignored.
 ##   B = hidden sensing: the face changes suspicion and lines, and the player isn't shown the reading.
-##   C = open sensing: like B, plus a monitor panel with "That's wrong" and "Switch off".
+##   C = open sensing: like B, plus the reading on the scene's monitor panel, with "That's wrong"
+##       and "Switch off". The panel itself lives in scenes/dialogue_base.tscn.
 ## Choose the condition with the page address (index.html?condition=A), or in the editor with
 ## Project > Project Settings > Run > Main Run Args (enable Advanced Settings): -- --condition=C
+## In debug builds the M key also steps through A, B, C, so one run can show all three.
 
 signal label_changed(new_label: String)
+## Sent when what the monitor shows has changed: the reading, the condition or the switch.
+signal changed
 
-const LABELS = ["calm", "nervous", "afraid", "angry"]
+const LABELS = ["calm", "tense", "smiling", "looked_away"]
+# webcam/emotion.js still sends the first set of labels. Until it sends the ones above,
+# its three stressed labels all count as tense.
+const OLD_LABELS = {"nervous": "tense", "afraid": "tense", "angry": "tense"}
+const MANUAL_KEYS = {KEY_Z: "calm", KEY_X: "tense", KEY_C: "smiling", KEY_V: "looked_away"}
 const CONDITIONS = ["A", "B", "C"]
 const POLL_SECONDS = 0.1  # read from the browser 10 times a second; the label changes slower than that
 
@@ -32,9 +41,8 @@ var switch_offs := 0
 var _is_web := OS.has_feature("web")
 var _poll_timer := 0.0
 var _debug_label: Label
-var _monitor_reading: Label
-var _switch_button: Button
 var _discarded_until_ms := 0
+var _last_shown := ""  # what the monitor showed last, to announce only real changes
 
 # Measuring window: seconds spent showing each label since start_window() was called.
 var _window_active := false
@@ -45,17 +53,20 @@ var _window_corrected := false  # set by "That's wrong": ignore the face until t
 func _ready() -> void:
 	_read_condition()
 	if not _is_web:
-		status = "manual: keys 1-4"
+		status = "manual: keys Z X C V"
 	if OS.is_debug_build():
 		_create_debug_label()
-	if condition == "C":
-		_create_monitor_panel()
 	_refresh_display()
 
 
 func _process(delta: float) -> void:
-	if _window_active and not _window_corrected and is_tracking():
+	if _window_active and not _window_corrected and uses_face() and is_tracking():
 		_window_seconds[label] = _window_seconds.get(label, 0.0) + delta
+
+	# The "discarded" message has had its 1.5 s: put the live reading back on the monitor.
+	if _discarded_until_ms != 0 and Time.get_ticks_msec() >= _discarded_until_ms:
+		_discarded_until_ms = 0
+		_refresh_display()
 
 	if not _is_web:
 		return
@@ -69,6 +80,25 @@ func _process(delta: float) -> void:
 ## True when the game should react to the face: not condition A, and not switched off.
 func uses_face() -> bool:
 	return condition != "A" and sensing_on
+
+
+## True when the story may react to the face right now: uses_face(), and the player has not
+## pressed "That's wrong" since the current measuring window started.
+func may_react() -> bool:
+	return uses_face() and not _window_corrected
+
+
+## The words the monitor shows for the current reading.
+func monitor_text() -> String:
+	if not sensing_on:
+		return "OFF"
+	if Time.get_ticks_msec() < _discarded_until_ms:
+		return "DISCARDED"
+	if calibrating:
+		return "CALIBRATING"
+	if not face_found:
+		return "NO FACE"
+	return label.replace("_", " ").to_upper()
 
 
 ## True when there is a face and a finished calibration, so the label means something.
@@ -85,8 +115,8 @@ func start_window() -> void:
 
 ## Stops measuring and summarises the window:
 ##   seconds         how long a face was tracked in total
-##   stressed_share  fraction of that time spent nervous, afraid or angry (0 to 1)
-##   stressed_label  the most common of those three, or "" if none appeared
+##   stressed_share  fraction of that time the face showed anything other than calm (0 to 1)
+##   stressed_label  the most common of those other labels, or "" if none appeared
 func end_window() -> Dictionary:
 	_window_active = false
 	var total := 0.0
@@ -161,20 +191,25 @@ func _read_from_browser() -> void:
 	face_found = reading.get("faceFound", false)
 	calibrating = reading.get("calibrating", false)
 	if reading.get("label") != null:
-		_set_label(reading["label"], reading.get("confidence", 0.0))
+		var new_label: String = reading["label"]
+		_set_label(OLD_LABELS.get(new_label, new_label), reading.get("confidence", 0.0))
 	_refresh_display()
 
 
-## Keys 1-4 choose calm, nervous, afraid, angry when there is no webcam.
+## Z, X, C, V choose calm, tense, smiling, looked away when there is no webcam.
+## In debug builds M steps to the next condition.
 func _unhandled_input(event: InputEvent) -> void:
-	if _is_web:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo:
 		return
-	if event is InputEventKey and event.pressed and not event.echo:
-		var index: int = event.keycode - KEY_1
-		if index >= 0 and index < LABELS.size():
-			face_found = true
-			_set_label(LABELS[index], 1.0)
-			_refresh_display()
+	if OS.is_debug_build() and key.keycode == KEY_M:
+		condition = CONDITIONS[(CONDITIONS.find(condition) + 1) % CONDITIONS.size()]
+		sensing_on = true
+		_refresh_display()
+	elif not _is_web and MANUAL_KEYS.has(key.keycode):
+		face_found = true
+		_set_label(MANUAL_KEYS[key.keycode], 1.0)
+		_refresh_display()
 
 
 ## Stores a new reading and announces it only when the label actually changes.
@@ -192,78 +227,24 @@ func _create_debug_label() -> void:
 	add_child(layer)
 
 	_debug_label = Label.new()
-	_debug_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	_debug_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_debug_label.position += Vector2(-12, 8)
-	_debug_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# Bottom left: the scene's monitor sits top right and the progress marks top left.
+	_debug_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	_debug_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_debug_label.position += Vector2(12, -8)
 	_debug_label.add_theme_font_size_override("font_size", 16)
 	_debug_label.add_theme_constant_override("outline_size", 6)
 	_debug_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	layer.add_child(_debug_label)
 
 
-## Condition C's monitor: shows the current reading with "That's wrong" and "Switch off".
-func _create_monitor_panel() -> void:
-	var layer := CanvasLayer.new()
-	layer.layer = 90  # above every scene, below the debug readout
-	add_child(layer)
-
-	var panel := PanelContainer.new()
-	panel.position = Vector2(12, 12)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.05, 0.1, 0.08, 0.85)
-	style.border_color = Color(0.5, 1.0, 0.85)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(4)
-	style.set_content_margin_all(10)
-	panel.add_theme_stylebox_override("panel", style)
-	layer.add_child(panel)
-
-	var column := VBoxContainer.new()
-	panel.add_child(column)
-
-	var title := Label.new()
-	title.text = "EMOTION COMPLIANCE MONITOR"
-	title.add_theme_font_size_override("font_size", 12)
-	title.add_theme_color_override("font_color", Color(0.5, 1.0, 0.85))
-	column.add_child(title)
-
-	_monitor_reading = Label.new()
-	_monitor_reading.add_theme_font_size_override("font_size", 20)
-	column.add_child(_monitor_reading)
-
-	var buttons := HBoxContainer.new()
-	column.add_child(buttons)
-
-	var wrong_button := Button.new()
-	wrong_button.text = "That's wrong"
-	wrong_button.focus_mode = Control.FOCUS_NONE  # don't steal keys from the dialogue buttons
-	wrong_button.pressed.connect(mark_wrong)
-	buttons.add_child(wrong_button)
-
-	_switch_button = Button.new()
-	_switch_button.focus_mode = Control.FOCUS_NONE
-	_switch_button.pressed.connect(func(): set_sensing(not sensing_on))
-	buttons.add_child(_switch_button)
-
-
-## Updates the debug readout and the monitor panel to match the current reading.
+## Updates the debug readout, and announces "changed" when what the monitor shows is different.
 func _refresh_display() -> void:
 	if _debug_label:
 		_debug_label.text = "Face: %s %d%%  [%s]  condition %s%s" % [
 			label, roundi(confidence * 100), status, condition,
 			"" if sensing_on else " (switched off)"]
 
-	if _monitor_reading == null:
-		return
-	_switch_button.text = "Switch off" if sensing_on else "Switch on"
-	if not sensing_on:
-		_monitor_reading.text = "Sensing off"
-	elif Time.get_ticks_msec() < _discarded_until_ms:
-		_monitor_reading.text = "Reading discarded"
-	elif calibrating:
-		_monitor_reading.text = "Calibrating..."
-	elif not face_found:
-		_monitor_reading.text = "No face detected"
-	else:
-		_monitor_reading.text = "%s  %d%%" % [label.to_upper(), roundi(confidence * 100)]
+	var shown := "%s|%s|%s" % [monitor_text(), condition, sensing_on]
+	if shown != _last_shown:
+		_last_shown = shown
+		changed.emit()

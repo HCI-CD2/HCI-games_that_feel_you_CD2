@@ -1,0 +1,213 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/dialogue_scene.gd" id="1_script"]
+[ext_resource type="Material" path="res://ui/postfx_material.tres" id="2_postfx"]
+[ext_resource type="Script" path="res://scripts/signal_bars.gd" id="3_bars"]
+[ext_resource type="Script" path="res://scripts/progress_diamonds.gd" id="4_diamonds"]
+
+[node name="DialogueScene" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="World" type="CanvasLayer" parent="."]
+layer = 0
+
+[node name="Background" type="TextureRect" parent="World"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="FX" type="CanvasLayer" parent="."]
+layer = 5
+
+[node name="PostFX" type="ColorRect" parent="FX"]
+material = ExtResource("2_postfx")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="UI" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="Progress" type="Control" parent="UI"]
+visible = false
+offset_left = 32.0
+offset_top = 28.0
+offset_right = 140.0
+offset_bottom = 44.0
+mouse_filter = 2
+script = ExtResource("4_diamonds")
+
+[node name="Monitor" type="PanelContainer" parent="UI"]
+visible = false
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -300.0
+offset_top = 24.0
+offset_right = -32.0
+offset_bottom = 84.0
+grow_horizontal = 0
+theme_type_variation = &"MonitorPanel"
+
+[node name="VBox" type="VBoxContainer" parent="UI/Monitor"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Caption" type="Label" parent="UI/Monitor/VBox"]
+layout_mode = 2
+theme_type_variation = &"MonitorCaption"
+text = "EMOTION COMPLIANCE MONITOR"
+
+[node name="Row" type="HBoxContainer" parent="UI/Monitor/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Bars" type="Control" parent="UI/Monitor/VBox/Row"]
+custom_minimum_size = Vector2(32, 24)
+layout_mode = 2
+size_flags_vertical = 4
+script = ExtResource("3_bars")
+
+[node name="Value" type="Label" parent="UI/Monitor/VBox/Row"]
+layout_mode = 2
+theme_type_variation = &"MonitorValue"
+text = "0"
+vertical_alignment = 1
+
+[node name="Word" type="Label" parent="UI/Monitor/VBox/Row"]
+layout_mode = 2
+theme_type_variation = &"MonitorCaption"
+text = "SUSPICION"
+vertical_alignment = 1
+
+[node name="Sense" type="VBoxContainer" parent="UI/Monitor/VBox"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Line" type="ColorRect" parent="UI/Monitor/VBox/Sense"]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+mouse_filter = 2
+color = Color(0.93, 0.9, 0.8, 0.35)
+
+[node name="ReadRow" type="HBoxContainer" parent="UI/Monitor/VBox/Sense"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ReadCaption" type="Label" parent="UI/Monitor/VBox/Sense/ReadRow"]
+layout_mode = 2
+theme_type_variation = &"MonitorCaption"
+text = "FACE READING"
+vertical_alignment = 1
+
+[node name="ReadValue" type="Label" parent="UI/Monitor/VBox/Sense/ReadRow"]
+layout_mode = 2
+theme_type_variation = &"MonitorValue"
+text = "CALM"
+vertical_alignment = 1
+
+[node name="Buttons" type="HBoxContainer" parent="UI/Monitor/VBox/Sense"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Wrong" type="Button" parent="UI/Monitor/VBox/Sense/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+theme_type_variation = &"MonitorButton"
+text = "THAT'S WRONG"
+
+[node name="Off" type="Button" parent="UI/Monitor/VBox/Sense/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+theme_type_variation = &"MonitorButton"
+text = "SWITCH OFF"
+
+[node name="Bubble" type="VBoxContainer" parent="UI"]
+custom_minimum_size = Vector2(480, 0)
+offset_left = 700.0
+offset_top = 160.0
+offset_right = 1180.0
+offset_bottom = 200.0
+theme_override_constants/separation = 6
+
+[node name="Dialogue" type="PanelContainer" parent="UI/Bubble"]
+layout_mode = 2
+theme_type_variation = &"SpeechBox"
+
+[node name="Margin" type="MarginContainer" parent="UI/Bubble/Dialogue"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 22
+
+[node name="Text" type="RichTextLabel" parent="UI/Bubble/Dialogue/Margin"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+
+[node name="Choices" type="VBoxContainer" parent="UI/Bubble"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Hint" type="HBoxContainer" parent="UI"]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -320.0
+offset_top = -58.0
+offset_right = -32.0
+offset_bottom = -26.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_constants/separation = 8
+alignment = 2
+
+[node name="HintLabel" type="Label" parent="UI/Hint"]
+layout_mode = 2
+theme_type_variation = &"HintText"
+text = "Continue"
+vertical_alignment = 1
+
+[node name="HintKey" type="PanelContainer" parent="UI/Hint"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_type_variation = &"KeyBadge"
+
+[node name="KeyLabel" type="Label" parent="UI/Hint/HintKey"]
+layout_mode = 2
+theme_type_variation = &"KeyText"
+text = "Space"
+
+[node name="Fade" type="CanvasLayer" parent="."]
+layer = 20
+
+[node name="Black" type="ColorRect" parent="Fade"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
