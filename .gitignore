@@ -1,8 +1,17 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
-.godot/
-.godot/
 
-# Exported builds (regenerate with Project > Export)
+# Exported builds (regenerate with tools/build_web.sh)
 build/
+
+# Development screenshots
+shots/
+
+# Machine-specific launcher
+run-local.bat
+
+# Local development helper (screenshots from the command line)
+scripts/dev_shot.gd
+scripts/dev_shot.gd.uid
+override.cfg
