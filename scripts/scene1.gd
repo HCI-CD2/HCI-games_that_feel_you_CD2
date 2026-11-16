@@ -1,35 +1,20 @@
-extends Control
+extends "res://scripts/dialogue_scene.gd"
 
-@onready var label = $Label
-@onready var back_button = $HBoxContainer/BackButton
-@onready var next_button = $HBoxContainer/NextButton
+const NEXT_SCENE := "res://scenes/scene2.tscn"
 
-var step = 0
 
-var lines = [
-	"The room is quiet.",
-	"I should have refused. What if they find out?",
-	"No, no. Everything will be fine. I need to calm down.",
-	"I've already thought it all through."
-]
+func _setup() -> void:
+	# The player's own thoughts: box on the plain right wall, clear of the door and the lamp.
+	place_box(Vector2(768, 120))
+	set_queue(lines_for("You", [
+		"*The room is quiet.*",
+		"*A small monitoring device is fixed high on the wall.*",
+		"*I have seen devices like it throughout the city.*",
+		"*I should have refused. What if they find out?*",
+		"*No, no. Everything will be fine. I need to calm down.*",
+		"*I've already thought it all through.*",
+	]))
 
-func _ready():
-	next_button.pressed.connect(_on_next_pressed)
-	back_button.pressed.connect(_on_back_pressed)
-	show_line()
 
-func show_line():
-	label.text = lines[step]
-	back_button.disabled = (step == 0)
-
-func _on_next_pressed():
-	if step < lines.size() - 1:
-		step += 1
-		show_line()
-	else:
-		get_tree().change_scene_to_file("res://scenes/scene2.tscn")
-
-func _on_back_pressed():
-	if step > 0:
-		step -= 1
-		show_line()
+func _on_queue_finished() -> void:
+	go_to(NEXT_SCENE)
