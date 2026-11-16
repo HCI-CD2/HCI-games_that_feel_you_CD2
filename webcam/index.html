@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Face Tracker Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #161616; color: #eee; margin: 24px; }
+    main { display: flex; gap: 24px; flex-wrap: wrap; }
+    /* scaleX(-1) mirrors the preview so it feels like looking in a mirror. */
+    video { width: 480px; max-width: 100%; transform: scaleX(-1); border-radius: 8px; background: #000; }
+    #status { color: #7fd; }
+    #panel { width: 420px; max-width: 100%; }
+    #label { font-size: 40px; font-weight: 700; margin: 0; text-transform: uppercase; }
+    #confidence { margin: 4px 0 16px; color: #aaa; }
+    h2 { font-size: 15px; color: #aaa; margin: 20px 0 6px; }
+    .row { display: grid; grid-template-columns: 170px 1fr 48px; gap: 8px; align-items: center; margin: 3px 0; font-size: 14px; }
+    .track { background: #333; height: 10px; border-radius: 5px; }
+    .fill { background: #7fd; height: 100%; border-radius: 5px; }
+    button { font: inherit; padding: 6px 14px; }
+  </style>
+</head>
+<body>
+  <h1>Face Tracker Test</h1>
+  <p id="status">Starting...</p>
+  <main>
+    <!-- muted + playsinline let the browser start the video without a click. -->
+    <video id="camera" autoplay muted playsinline></video>
+    <section id="panel">
+      <p id="label">-</p>
+      <p id="confidence"></p>
+      <button id="recalibrate">Recalibrate</button>
+      <h2>Evidence for each label (halfway = threshold)</h2>
+      <div id="evidence"></div>
+      <h2>Strongest raw movements</h2>
+      <div id="scores"></div>
+    </section>
+  </main>
+  <!-- type="module" is what allows tracker.js to use "import". -->
+  <script type="module" src="tracker.js"></script>
+</body>
+</html>

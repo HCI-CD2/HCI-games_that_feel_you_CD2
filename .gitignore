@@ -3,3 +3,6 @@
 /android/
 .godot/
 .godot/
+
+# Exported builds (regenerate with Project > Export)
+build/
